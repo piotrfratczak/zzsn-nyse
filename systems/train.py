@@ -2,7 +2,7 @@ import torch
 from torch import nn, optim
 import numpy as np
 
-from models.grunet import GRUNet
+from models.GRUNet import GRUNet
 import utils.preprocess as pp
 
 

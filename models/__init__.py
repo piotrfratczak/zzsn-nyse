@@ -1,1 +1,1 @@
-from .grunet import GRUNet
+from .GRUNet import GRUNet
