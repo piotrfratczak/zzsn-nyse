@@ -1,11 +1,11 @@
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 import numpy as np
 
 from load_data import *
 
-df = load_file('nyse/prices.csv')
+df = load_file('nyse/prices-split-adjusted.csv')
 
 print(df.shape)
 print(df.head())
@@ -20,6 +20,9 @@ plt.show()
 print(df.info())
 
 print(f'Missing values: {df.isnull().sum().sum()}')
+
+symbols = list(set(df.symbol))
+print(symbols[:10])
 
 plot_symbol = 'AAPL'
 plot_df = df[df['symbol'] == plot_symbol]
@@ -43,5 +46,8 @@ plt.legend(loc="best")
 plt.grid(which="major", axis="both")
 plt.show()
 
-symbols = list(set(df.symbol))
-print(symbols[:10])
+# TODO: normalize first
+plot_acf(plot_df['close'].values[:100])
+plt.show()
+plot_pacf(plot_df['close'].values[:100], method='ywm')
+plt.show()
