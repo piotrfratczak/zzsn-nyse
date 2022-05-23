@@ -3,7 +3,7 @@ from torch import nn, optim
 import numpy as np
 
 from models.GRUNet import GRUNet
-import utils.preprocess as pp
+from utils.preprocessor import Preprocessor
 
 
 BATCH_SIZE = 128
@@ -11,14 +11,15 @@ SEQ_LEN = 7
 PRED = 1
 
 
-def train(epochs=10):
-    columns = ['close', 'open', 'low', 'high']
-    train_loader, val_loader, test_loader = pp.preprocess(columns, SEQ_LEN, PRED, BATCH_SIZE)
+def train(epochs=100):
+    columns = ['open', 'close', 'low', 'high', 'volume']
+    targets = ['close']
+    pp = Preprocessor()
+    train_loader, val_loader, test_loader = pp.preprocess(columns, targets, SEQ_LEN, PRED, BATCH_SIZE)
 
-    model = GRUNet(d_in=len(columns), h=200, d_out=PRED, gru_layers=10, preds_len=PRED)
+    model = GRUNet(input_dim=len(columns), hidden_dim=200, output_dim=PRED, gru_layers=10)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
-
 
     train_preds = []
     val_preds = []
