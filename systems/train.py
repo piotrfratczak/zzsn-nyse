@@ -6,18 +6,14 @@ from models.GRUNet import GRUNet
 from utils.preprocessor import Preprocessor
 
 
-BATCH_SIZE = 128
-SEQ_LEN = 7
-PRED = 1
-
-
-def train(epochs=100):
-    columns = ['open', 'close', 'low', 'high', 'volume']
+def train(epochs: int = 100, batch_size: int = 128, seq_len: int = 3, pred_len: int = 1) -> None:
+    columns = ['open', 'close', 'low', 'high']
     targets = ['close']
-    pp = Preprocessor()
-    train_loader, val_loader, test_loader = pp.preprocess(columns, targets, SEQ_LEN, PRED, BATCH_SIZE)
 
-    model = GRUNet(input_dim=len(columns), hidden_dim=200, output_dim=PRED, gru_layers=10)
+    pp = Preprocessor()
+    train_loader, val_loader, test_loader = pp.preprocess(columns, targets, seq_len, pred_len, batch_size)
+
+    model = GRUNet(input_dim=len(columns), hidden_dim=128, output_dim=pred_len, gru_layers=32)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
 
