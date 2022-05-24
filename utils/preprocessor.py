@@ -55,7 +55,9 @@ class Preprocessor:
     def preprocess(self, columns: List[str], targets: List[str], seq_len: int, pred_len: int, batch_size: int):
         columns = list(set(columns).union(set(targets)))
         dataset = prepare_dataset()
-        self.scaler = StandardScaler().fit(dataset[columns])
+
+        log_returns = calc_log_returns(dataset[columns])
+        self.scaler = StandardScaler().fit(log_returns)
 
         split_dataset = self.concatenate_stocks(dataset, columns, seq_len, pred_len, targets)
         train_loader, val_loader, test_loader = to_loaders(split_dataset, batch_size)
