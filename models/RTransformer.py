@@ -10,18 +10,19 @@ import numpy as np
 
 
 class RT(nn.Module):
-    def __init__(self, input_size, d_model, output_size, h, rnn_type, ksize, n, n_level, dropout, emb_dropout):
+    def __init__(self, input_size, d_model, output_size, h, rnn_type, ksize, n, n_level, dropout, pred_len):
         super(RT, self).__init__()
+        self.pred_len = pred_len
         self.encoder = nn.Linear(input_size, d_model)
         self.rt = RTransformer(d_model, rnn_type, ksize, n_level, n, h, dropout)
         self.linear = nn.Linear(d_model, output_size)
-        self.sig = nn.Sigmoid()
 
     def forward(self, x):
         x = self.encoder(x)
         output = self.rt(x)
+        output = output[:, -self.pred_len, :]
         output = self.linear(output).double()
-        return self.sig(output)
+        return output
 
 
 def clones(module, N):
@@ -39,7 +40,10 @@ class LayerNorm(nn.Module):
 
     def forward(self, x):
         mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
+        if x.size(-1) == 1:
+            std = torch.zeros_like(x)
+        else:
+            std = x.std(-1, keepdim=True)
         return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
 
 
