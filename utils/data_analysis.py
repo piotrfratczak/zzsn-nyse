@@ -1,6 +1,5 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 from load_data import *
@@ -27,7 +26,8 @@ def analyze_data():
     price_columns = ['open', 'close', 'high', 'low']
     numeric_columns = ['open', 'close', 'high', 'low', 'volume']
     log_returns[price_columns] = calc_log_returns(log_returns[price_columns])
-    log_returns[numeric_columns] = StandardScaler().fit_transform(log_returns[numeric_columns])
+    nc = log_returns[numeric_columns]
+    log_returns[numeric_columns] = (nc - nc.mean()) / nc.std()
     plt.figure(figsize=(10, 10))
     sns.heatmap(log_returns.corr(),
                 annot=True, fmt='.1g', vmin=-1, vmax=1, center=0, linewidth=3, linecolor='black', square=True)
