@@ -7,27 +7,25 @@ import os
 import warnings
 
 from models.RTransformer import RT
-import utils.preprocessor as pp
+from utils.preprocessor import Preprocessor
 
-warnings.filterwarnings("ignore")   # Suppress the RunTimeWarning on unicode
+# warnings.filterwarnings("ignore")  # Suppress the RunTimeWarning on unicode
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--cuda', action='store_false')
 parser.add_argument('--dropout', type=float, default=0.1)
 parser.add_argument('--clip', type=float, default=0.15)
-parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--epochs', type=int, default=20)
 parser.add_argument('--ksize', type=int, default=6)
 parser.add_argument('--n_level', type=int, default=3)
-parser.add_argument('--log-interval', type=int, default=100, metavar='N')
+parser.add_argument('--log_interval', type=int, default=1000, metavar='N')
 parser.add_argument('--lr', type=float, default=5e-05)
-parser.add_argument('--optim', type=str, default='SGD')
+parser.add_argument('--optim', type=str, default='Adam')
 parser.add_argument('--rnn_type', type=str, default='GRU')
 parser.add_argument('--d_model', type=int, default=1)
 parser.add_argument('--n', type=int, default=1)
 parser.add_argument('--h', type=int, default=1)
 parser.add_argument('--seed', type=int, default=1111)
-parser.add_argument('--data', type=str, default='Nott')
-
 
 args = parser.parse_args()
 np.random.seed(args.seed)
@@ -38,39 +36,34 @@ base_path = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(base_path, 'data/')
 s_dir = os.path.join(base_path, 'output/')
 
-
 print(args)
 
 # ---------------
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 SEQ_LEN = 7
-PRED = 1
-columns = ['close']
-train_loader, val_loader, test_loader = pp.preprocess(columns, SEQ_LEN, PRED, BATCH_SIZE)
-X_train = next(iter(train_loader))
-X_val = next(iter(val_loader))
-X_test = next(iter(test_loader))
+pred_len = 1
+columns = ['close', 'open']
+targets = ['close']
+pp = Preprocessor()
+train_loader, val_loader, test_loader = pp.preprocess(columns, targets, SEQ_LEN, pred_len, BATCH_SIZE)
 # ------------
 
 input_size = len(columns)
 
 dropout = args.dropout
-emb_dropout = args.dropout
 
-
-model = RT(input_size, args.d_model, input_size, h=args.h, rnn_type=args.rnn_type, ksize=args.ksize, 
-            n_level=args.n_level, n=args.n, dropout=dropout, emb_dropout=emb_dropout)
+model = RT(input_size, len(columns), len(targets), h=args.h, rnn_type=args.rnn_type, ksize=args.ksize,
+           n_level=args.n_level, n=args.n, dropout=dropout, pred_len=pred_len)
 model.to(device)
 
-model_name = "data_{}_d_{}_h_{}_type_{}_k_{}_level_{}_n_{}_lr_{}_drop_{}".format(args.data, args.d_model, args.h, 
-            args.rnn_type, args.ksize, args.n_level, args.n, args.lr, args.dropout)
-
+model_name = "d_{}_h_{}_type_{}_k_{}_level_{}_n_{}_lr_{}_drop_{}".format(args.d_model, args.h, args.rnn_type,
+                                                                         args.ksize, args.n_level, args.n, args.lr,
+                                                                         args.dropout)
 
 message_filename = s_dir + 'r_' + model_name + '.txt'
 model_filename = s_dir + 'm_' + model_name + '.pt'
 with open(message_filename, 'w') as out:
     out.write('start\n')
-
 
 criterion = nn.CrossEntropyLoss()
 lr = args.lr
@@ -84,23 +77,20 @@ def save(model, save_filename):
 
 
 def output_s(message, save_filename):
-    print (message)
+    print(message)
     with open(save_filename, 'a') as out:
         out.write(message + '\n')
 
 
-def evaluate(X_data, name='Eval'):
+def evaluate(data_loader, name='Eval'):
     model.eval()
-    eval_idx_list = np.arange(len(X_data), dtype="int32")
     total_loss = 0.0
     count = 0
     with torch.no_grad():
-        for idx in eval_idx_list:
-            x = X_data[0][idx]
-            y = X_data[1][idx]
-            output = model(x.unsqueeze(0)).squeeze(0)
-            loss = -torch.trace(torch.matmul(y, torch.log(output).float().t()) +
-                                torch.matmul((1-y), torch.log(1-output).float().t()))
+        for idx, (x, y) in enumerate(data_loader):
+            output = model(x)
+            output = output.reshape(output.size(0), y.size(1), y.size(2)).double()
+            loss = criterion(output, y.double())
             total_loss += loss.item()
             count += output.size(0)
         eval_loss = total_loss / count
@@ -109,30 +99,27 @@ def evaluate(X_data, name='Eval'):
         return eval_loss
 
 
-def train(ep):
+def train(epoch):
     model.train()
     total_loss = 0
     count = 0
-    train_idx_list = np.arange(len(X_train), dtype="int32")
-    np.random.shuffle(train_idx_list)
-    for idx in train_idx_list:
-        x = X_train[0][idx]
-        y = X_train[1][idx]
-
+    for idx, (inputs, labels) in enumerate(train_loader):
         optimizer.zero_grad()
-        output = model(x.unsqueeze(0)).squeeze(0)
-        loss = -torch.trace(torch.matmul(y, torch.log(output).float().t()) +
-                            torch.matmul((1 - y), torch.log(1 - output).float().t()))
+        output = model(inputs)
+        output = output.reshape(output.size(0), labels.size(1), labels.size(2))
+        loss = criterion(output, labels)
         total_loss += loss.item()
         count += output.size(0)
 
         if args.clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+
         loss.backward()
         optimizer.step()
+
         if idx > 0 and idx % args.log_interval == 0:
             cur_loss = total_loss / count
-            message = "Epoch {:2d} | lr {:.5f} | loss {:.5f}".format(ep, lr, cur_loss)
+            message = "Epoch {:2d} | lr {:.5f} | loss {:.5f}".format(epoch, lr, cur_loss)
             output_s(message, message_filename)
             total_loss = 0.0
             count = 0
@@ -141,14 +128,14 @@ def train(ep):
 if __name__ == "__main__":
     best_vloss = 1e8
     vloss_list = []
-    for ep in range(1, args.epochs+1):
-        train(ep)
-        vloss = evaluate(X_val, name='Validation')
-        tloss = evaluate(X_test, name='Test')
-        if vloss < best_vloss or ep == 1:
+    for epoch in range(1, args.epochs + 1):
+        train(epoch)
+        vloss = evaluate(val_loader, name='Validation')
+        tloss = evaluate(test_loader, name='Test')
+        if vloss < best_vloss or epoch == 1:
             save(model, model_filename)
             best_vloss = vloss
-        if ep > 10 and vloss > max(vloss_list[-3:]):
+        if epoch > 10 and vloss > max(vloss_list[-3:]):
             lr /= 10
             output_s('lr = {}'.format(lr), message_filename)
             for param_group in optimizer.param_groups:
