@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from typing import List
 from numpy.lib import stride_tricks as st
-from sklearn.preprocessing import StandardScaler
 from torch.utils.data import TensorDataset, DataLoader
 
 from .load_data import load_file
@@ -35,46 +34,48 @@ def prepare_dataset():
     return dataset
 
 
-def to_loaders(datasets, batch_size):
+def to_loaders(datasets: tuple, batch_size: int):
     x_train, y_train, x_val, y_val, x_test, y_test = datasets
 
     train_set = TensorDataset(to_tensor(x_train), to_tensor(y_train))
     val_set = TensorDataset(to_tensor(x_val), to_tensor(y_val))
     test_set = TensorDataset(to_tensor(x_test), to_tensor(y_test))
 
-    train_loader = DataLoader(train_set, batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size, shuffle=True)
+    train_loader = DataLoader(train_set, batch_size, shuffle=True, drop_last=True)
+    val_loader = DataLoader(val_set, batch_size, shuffle=True, drop_last=True)
+    test_loader = DataLoader(test_set, batch_size, shuffle=False, drop_last=True)
     return train_loader, val_loader, test_loader
 
 
 class Preprocessor:
     def __init__(self):
-        self.scaler = None
+        self.scalers = dict()
 
     def preprocess(self, columns: List[str], targets: List[str], seq_len: int, pred_len: int, batch_size: int):
         columns = list(set(columns).union(set(targets)))
         dataset = prepare_dataset()
-
-        log_returns = calc_log_returns(dataset[columns])
-        self.scaler = StandardScaler().fit(log_returns)
-
         split_dataset = self.concatenate_stocks(dataset, columns, seq_len, pred_len, targets)
         train_loader, val_loader, test_loader = to_loaders(split_dataset, batch_size)
         return train_loader, val_loader, test_loader
 
-    def inverse_standardize(self, df):
-        return self.scaler.inverse_transform(df)
+    def standardize(self, df: pd.DataFrame, symbol: str):
+        mean, std = df.mean(), df.std()
+        self.scalers.update({symbol: (mean, std)})
+        return (df - mean) / std
 
-    def concatenate_stocks(self, dataset, columns, seq_len, pred_len, targets):
-        symbols = list(set(dataset.symbol))  # TODO: pick stock?
-        x_train = x_val = x_test = np.empty((1, seq_len, len(columns)))
-        y_train = y_val = y_test = np.empty((1, 1, 1))
+    def inverse_standardize(self, df: pd.DataFrame, symbol: str):
+        mean, std = self.scalers[symbol]
+        return df * std + mean
 
-        for symbol in symbols:
+    def concatenate_stocks(self, dataset: pd.DataFrame, columns: List[str], seq_len: int, pred_len: int, targets: List[str]):
+        symbols = list(set(dataset.symbol))
+        stock_df = pick_stock(dataset, symbols[0])
+        x_train, y_train, x_val, y_val, x_test, y_test = self.split_data(stock_df[columns], symbols[0], seq_len, pred_len, targets)
+
+        for symbol in symbols[1:]:
             stock_df = pick_stock(dataset, symbol)
             x_train_s, y_train_s, x_val_s, y_val_s, x_test_s, y_test_s = \
-                self.split_data(stock_df[columns], seq_len, pred_len, targets)
+                self.split_data(stock_df[columns], symbol, seq_len, pred_len, targets)
 
             x_train = np.concatenate((x_train, x_train_s))
             y_train = np.concatenate((y_train, y_train_s))
@@ -84,22 +85,21 @@ class Preprocessor:
             y_test = np.concatenate((y_test, y_test_s))
         return x_train, y_train, x_val, y_val, x_test, y_test
 
-    def split_data(self, stock, seq_len: int, pred_len: int, targets: List[str], val_per100: int = 10, test_per100: int = 10):
-        val_size = int(np.round(val_per100 / 100 * stock.shape[0]))
-        test_size = int(np.round(test_per100 / 100 * stock.shape[0]))
+    def split_data(self, stock: pd.DataFrame, symbol: str, seq_len: int, pred_len: int, targets: List[str], val_split: int = 10, test_split: int = 10):
+        val_size = int(np.round(val_split / 100 * stock.shape[0]))
+        test_size = int(np.round(test_split / 100 * stock.shape[0]))
         train_size = stock.shape[0] - (val_size + test_size)
 
-        train_series = calc_log_returns(stock[:train_size])
-        val_series = calc_log_returns(stock[train_size: train_size + val_size])
-        test_series = calc_log_returns(stock[train_size + val_size:])
+        log_returns = calc_log_returns(stock)
+        standardized_log_returns = self.standardize(log_returns, symbol)
 
-        scaled_train_series = self.scaler.transform(train_series)
-        scaled_val_series = self.scaler.transform(val_series)
-        scaled_test_series = self.scaler.transform(test_series)
+        train_series = standardized_log_returns[:train_size]
+        val_series = standardized_log_returns[train_size: train_size + val_size]
+        test_series = standardized_log_returns[train_size + val_size:]
 
-        train_windows = slide_window(scaled_train_series, seq_len, pred_len)
-        val_windows = slide_window(scaled_val_series, seq_len, pred_len)
-        test_windows = slide_window(scaled_test_series, seq_len, pred_len)
+        train_windows = slide_window(train_series, seq_len, pred_len)
+        val_windows = slide_window(val_series, seq_len, pred_len)
+        test_windows = slide_window(test_series, seq_len, pred_len)
 
         targets_idx = [stock.columns.get_loc(target) for target in targets if target in stock]
 
@@ -109,4 +109,5 @@ class Preprocessor:
         y_val = val_windows[:, -pred_len:, targets_idx]
         x_test = test_windows[:, :-pred_len, :]
         y_test = test_windows[:, -pred_len:, targets_idx]
+
         return x_train, y_train, x_val, y_val, x_test, y_test
