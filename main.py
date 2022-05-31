@@ -1,9 +1,8 @@
-import utils.load_data
-from systems.train import train
+from core.train import train
 
 
 def main() -> None:
-    train(2)
+    train()
 
 
 if __name__ == '__main__':

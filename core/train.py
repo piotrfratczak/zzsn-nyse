@@ -3,15 +3,15 @@ from torch import nn, optim
 import numpy as np
 
 from models.GRUNet import GRUNet
-from utils.preprocessor import Preprocessor
+from features.make_dataset import DatasetMaker
 
 
 def train(epochs: int = 100, batch_size: int = 32, seq_len: int = 3, pred_len: int = 1) -> None:
     columns = ['open', 'close', 'low', 'high']
     targets = ['close']
 
-    pp = Preprocessor()
-    train_loader, val_loader, test_loader = pp.preprocess(columns, targets, seq_len, pred_len, batch_size)
+    pp = DatasetMaker()
+    train_loader, val_loader, test_loader = pp.make_dataset(columns, targets, seq_len, pred_len, batch_size)
 
     model = GRUNet(input_dim=len(columns), hidden_dim=128, output_dim=len(targets), gru_layers=32, pred_len=pred_len)
     criterion = nn.MSELoss()

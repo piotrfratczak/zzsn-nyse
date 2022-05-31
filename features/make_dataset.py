@@ -5,7 +5,7 @@ from typing import List
 from numpy.lib import stride_tricks as st
 from torch.utils.data import TensorDataset, DataLoader
 
-from .load_data import load_file
+from utils.load_data import load_file
 
 
 def calc_log_returns(prices):
@@ -47,11 +47,11 @@ def to_loaders(datasets: tuple, batch_size: int):
     return train_loader, val_loader, test_loader
 
 
-class Preprocessor:
+class DatasetMaker:
     def __init__(self):
         self.scalers = dict()
 
-    def preprocess(self, columns: List[str], targets: List[str], seq_len: int, pred_len: int, batch_size: int):
+    def make_dataset(self, columns: List[str], targets: List[str], seq_len: int, pred_len: int, batch_size: int):
         columns = list(set(columns).union(set(targets)))
         dataset = prepare_dataset()
         split_dataset = self.concatenate_stocks(dataset, columns, seq_len, pred_len, targets)

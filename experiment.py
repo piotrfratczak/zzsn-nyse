@@ -7,7 +7,7 @@ import os
 import warnings
 
 from models.RTransformer import RT
-from utils.preprocessor import Preprocessor
+from features.make_dataset import DatasetMaker
 
 # warnings.filterwarnings("ignore")  # Suppress the RunTimeWarning on unicode
 
@@ -44,8 +44,8 @@ SEQ_LEN = 7
 pred_len = 1
 columns = ['close', 'open']
 targets = ['close']
-pp = Preprocessor()
-train_loader, val_loader, test_loader = pp.preprocess(columns, targets, SEQ_LEN, pred_len, BATCH_SIZE)
+dm = DatasetMaker()
+train_loader, val_loader, test_loader = dm.make_dataset(columns, targets, SEQ_LEN, pred_len, BATCH_SIZE)
 # ------------
 
 input_size = len(columns)

@@ -2,11 +2,11 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
-from load_data import *
-from utils.preprocessor import calc_log_returns
+from utils.load_data import *
+from features.make_dataset import calc_log_returns
 
 
-def analyze_data():
+def analyze():
     df = load_file('nyse/prices-split-adjusted.csv')
 
     print(df.shape)
@@ -74,4 +74,4 @@ def analyze_data():
 
 
 if __name__ == '__main__':
-    analyze_data()
+    analyze()
