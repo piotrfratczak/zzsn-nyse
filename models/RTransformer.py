@@ -31,7 +31,7 @@ def clones(module, N):
 
 
 class LayerNorm(nn.Module):
-    """Construct a layernorm module."""
+    """Construct a layer norm module."""
     def __init__(self, features, eps=1e-6):
         super(LayerNorm, self).__init__()
         self.a_2 = nn.Parameter(torch.ones(features))
@@ -58,7 +58,7 @@ class SublayerConnection(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        "Apply residual connection to any sublayer with the same size."
+        """Apply residual connection to any sublayer with the same size."""
         return x + self.dropout(sublayer(self.norm(x)))
 
 
@@ -82,8 +82,7 @@ def attention(query, key, value, mask=None, dropout=None):
     """
     d_k = query.size(-1)
     # scores: batch_size, n_head, seq_len, seq_len
-    scores = torch.matmul(query, key.transpose(-2, -1)) \
-             / math.sqrt(d_k)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
 
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
@@ -113,11 +112,11 @@ class MHPooling(nn.Module):
 
     def forward(self, x):
         """Implements Figure 2"""
-        nbatches, seq_len, d_model = x.shape
+        n_batches, seq_len, d_model = x.shape
 
         # 1) Do all the linear projections in batch from d_model => h x d_k 
         query, key, value = \
-            [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+            [l(x).view(n_batches, -1, self.h, self.d_k).transpose(1, 2)
              for l, x in zip(self.linears, (x, x, x))]
 
         # 2) Apply attention on all the projected vectors in batch. 
@@ -126,7 +125,7 @@ class MHPooling(nn.Module):
 
         # 3) "Concat" using a view and apply a final linear. 
         x = x.transpose(1, 2).contiguous() \
-            .view(nbatches, -1, self.h * self.d_k)
+            .view(n_batches, -1, self.h * self.d_k)
         return self.linears[-1](x)
 
 
@@ -152,7 +151,7 @@ class LocalRNN(nn.Module):
         self.zeros = torch.zeros((self.ksize - 1, input_dim))
 
     def forward(self, x):
-        nbatches, l, input_dim = x.shape
+        n_batches, l, input_dim = x.shape
         x = self.get_K(x)  # b x seq_len x ksize x d_model
         batch, l, ksize, d_model = x.shape
         h = self.rnn(x.view(-1, self.ksize, d_model))[0][:, -1, :]
@@ -176,7 +175,7 @@ class LocalRNNLayer(nn.Module):
         self.connection = SublayerConnection(output_dim, dropout)
 
     def forward(self, x):
-        "Follow Figure 1 (left) for connections."
+        """Follow Figure 1 (left) for connections."""
         x = self.connection(x, self.local_rnn)
         return x
 
