@@ -1,3 +1,4 @@
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
@@ -29,6 +30,7 @@ def analyze():
     nc = log_returns[numeric_columns]
     log_returns[numeric_columns] = (nc - nc.mean()) / nc.std()
     plt.figure(figsize=(10, 10))
+    plt.title('Macierz korelacji zmiennych uczących', fontsize=20)
     sns.heatmap(log_returns.corr(),
                 annot=True, fmt='.1g', vmin=-1, vmax=1, center=0, linewidth=3, linecolor='black', square=True)
     plt.show()
@@ -69,8 +71,11 @@ def analyze():
 
     plot_acf(plot_returns['close'])
     plt.show()
+
     plot_pacf(plot_returns['close'], method='ywm')
     plt.grid()
+    plt.minorticks_on()
+    plt.grid(linestyle='--', which='minor', axis='x')
     plt.show()
 
 
