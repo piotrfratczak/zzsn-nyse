@@ -2,7 +2,7 @@ import torch
 import wandb
 import torch.nn as nn
 import torch.optim as optim
-from torchmetrics.functional import dice_score, r2_score, mean_squared_error, mean_absolute_percentage_error
+from torchmetrics.functional import r2_score, mean_squared_error, mean_absolute_percentage_error
 
 from utils.setup import save_model, load_model, get_filepaths, output_log
 
@@ -114,4 +114,5 @@ def predict(model, data_loader):
             predicted.append(output)
     original = torch.cat(original, dim=0).squeeze()
     predicted = torch.cat(predicted, dim=0).squeeze()
+    wandb.log({'target': original.numpy(), 'prediction': predicted.numpy()})
     return predicted, original
