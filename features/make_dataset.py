@@ -53,11 +53,13 @@ class DatasetMaker:
         self.scalers = dict()
 
     def make_dataset(self, args):
+        print('Start preparing dataset...')
         features, targets = get_features(args)
         features = list(set(features).union(set(targets)))
         dataset = prepare_dataset()
         split_dataset = self.concatenate_stocks(dataset, features, targets, args.seq_len, args.proj_len)
         train_loader, val_loader, test_loader = to_loaders(split_dataset, args.batch_size)
+        print('Dataset prepared.')
         return train_loader, val_loader, test_loader
 
     def standardize(self, df: pd.DataFrame, symbol: str):
@@ -69,10 +71,12 @@ class DatasetMaker:
         mean, std = self.scalers[symbol]
         return df * std + mean
 
-    def concatenate_stocks(self, dataset: pd.DataFrame, features: List[str], targets: List[str], seq_len: int, proj_len: int):
+    def concatenate_stocks(self, dataset: pd.DataFrame, features: List[str], targets: List[str],
+                           seq_len: int, proj_len: int):
         symbols = list(set(dataset.symbol))
         stock_df = pick_stock(dataset, symbols[0])
-        x_train, y_train, x_val, y_val, x_test, y_test = self.split_data(stock_df[features], symbols[0], seq_len, proj_len, targets)
+        x_train, y_train, x_val, y_val, x_test, y_test =\
+            self.split_data(stock_df[features], symbols[0], seq_len, proj_len, targets)
 
         for symbol in symbols[1:]:
             stock_df = pick_stock(dataset, symbol)
@@ -87,7 +91,8 @@ class DatasetMaker:
             y_test = np.concatenate((y_test, y_test_s))
         return x_train, y_train, x_val, y_val, x_test, y_test
 
-    def split_data(self, stock: pd.DataFrame, symbol: str, seq_len: int, proj_len: int, targets: List[str], val_split: int = 10, test_split: int = 10):
+    def split_data(self, stock: pd.DataFrame, symbol: str, seq_len: int, proj_len: int, targets: List[str],
+                   val_split: int = 10, test_split: int = 10):
         val_size = int(np.round(val_split / 100 * stock.shape[0]))
         test_size = int(np.round(test_split / 100 * stock.shape[0]))
         train_size = stock.shape[0] - (val_size + test_size)

@@ -9,19 +9,25 @@ from models.GRUNet import GRUNet
 from models.RTransformer import RT
 
 
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
 def parse_args():
-    wandb.init(project="zzsn-nyse", entity="piotrfratczak")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--features', type=str, default='cohl')
     parser.add_argument('--targets', type=str, default='c')
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--clip', type=float, default=0.15)
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--ksize', type=int, default=6)
     parser.add_argument('--n_level', type=int, default=3)
     parser.add_argument('--log_interval', type=int, default=500, metavar='N')
-    parser.add_argument('--lr', type=float, default=5e-05)
+    parser.add_argument('--lr', type=float, default=5e-03)
     parser.add_argument('--optim', type=str, default='Adam')
     parser.add_argument('--model', type=str, default='RT')
     parser.add_argument('--rnn_type', type=str, default='GRU')
@@ -37,9 +43,12 @@ def parse_args():
     log_filename, _ = get_filepaths(args)
     start_log(log_filename)
     set_seeds(args)
-
-    wandb.config = args
     print(args)
+
+    args_dict = vars(args)
+    wandb.init(project="zzsn-nyse", entity="piotrfratczak", config=args_dict)
+    config = wandb.config
+    args = dotdict(config)
 
     return args
 

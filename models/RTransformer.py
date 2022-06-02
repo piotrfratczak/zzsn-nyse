@@ -9,6 +9,9 @@ import torch.nn.functional as F
 import numpy as np
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 class RT(nn.Module):
     def __init__(self, input_size, output_size, d_model, h, rnn_type, ksize, n, n_level, proj_len, dropout):
         super(RT, self).__init__()
@@ -108,7 +111,7 @@ class MHPooling(nn.Module):
         # auto-regressive
         attn_shape = (1, 3000, 3000)
         subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
-        self.mask = (torch.from_numpy(subsequent_mask) == 0).unsqueeze(1)
+        self.mask = (torch.from_numpy(subsequent_mask) == 0).unsqueeze(1).to(device)
 
     def forward(self, x):
         """Implements Figure 2"""
@@ -147,8 +150,8 @@ class LocalRNN(nn.Module):
 
         # To speed up
         idx = [i for j in range(self.ksize - 1, 10000, 1) for i in range(j - (self.ksize - 1), j + 1, 1)]
-        self.select_index = torch.LongTensor(idx)
-        self.zeros = torch.zeros((self.ksize - 1, input_dim))
+        self.select_index = torch.LongTensor(idx).to(device)
+        self.zeros = torch.zeros((self.ksize - 1, input_dim)).to(device)
 
     def forward(self, x):
         n_batches, l, input_dim = x.shape
