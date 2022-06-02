@@ -10,9 +10,9 @@ import numpy as np
 
 
 class RT(nn.Module):
-    def __init__(self, input_size, d_model, output_size, h, rnn_type, ksize, n, n_level, dropout, pred_len):
+    def __init__(self, input_size, output_size, d_model, h, rnn_type, ksize, n, n_level, proj_len, dropout):
         super(RT, self).__init__()
-        self.pred_len = pred_len
+        self.proj_len = proj_len
         self.encoder = nn.Linear(input_size, d_model)
         self.rt = RTransformer(d_model, rnn_type, ksize, n_level, n, h, dropout)
         self.linear = nn.Linear(d_model, output_size)
@@ -20,7 +20,7 @@ class RT(nn.Module):
     def forward(self, x):
         x = self.encoder(x)
         output = self.rt(x)
-        output = output[:, -self.pred_len, :]
+        output = output[:, -self.proj_len, :]
         output = self.linear(output).double()
         return output
 
@@ -207,7 +207,6 @@ class RTransformer(nn.Module):
     """
     def __init__(self, d_model, rnn_type, ksize, n_level, n, h, dropout):
         super(RTransformer, self).__init__()
-        N = n
         self.d_model = d_model
         self.dropout = nn.Dropout(dropout)
         self.norm = LayerNorm(d_model)
@@ -216,7 +215,7 @@ class RTransformer(nn.Module):
         layers = []
         for i in range(n_level):
             layers.append(
-                Block(d_model, d_model, rnn_type, ksize, N=N, h=h, dropout=dropout))
+                Block(d_model, d_model, rnn_type, ksize, N=n, h=h, dropout=dropout))
         self.forward_net = nn.Sequential(*layers)
 
     def forward(self, x):

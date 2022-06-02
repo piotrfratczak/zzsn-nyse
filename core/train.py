@@ -1,138 +1,92 @@
 import torch
-from torch import nn, optim
-import numpy as np
+import wandb
+import torch.nn as nn
+import torch.optim as optim
 
-from models.GRUNet import GRUNet
-from features.make_dataset import DatasetMaker
-
-
-def train(epochs: int = 100, batch_size: int = 32, seq_len: int = 3, pred_len: int = 1) -> None:
-    columns = ['open', 'close', 'low', 'high']
-    targets = ['close']
-
-    pp = DatasetMaker()
-    train_loader, val_loader, test_loader = pp.make_dataset(columns, targets, seq_len, pred_len, batch_size)
-
-    model = GRUNet(input_dim=len(columns), hidden_dim=128, output_dim=len(targets), gru_layers=32, pred_len=pred_len)
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters())
-
-    train_preds = []
-    val_preds = []
-
-    train_losses = []
-    val_losses = []
-    for epoch in range(epochs):
-        print('----------')
-        print(f'Epoch: {epoch+1}/{epochs}')
-
-        train_loss = 0
-        val_loss = 0
-
-        model.train()
-        for inputs, labels in train_loader:
-            optimizer.zero_grad()
-
-            preds = model(inputs)
-            loss = criterion(preds, labels)
-            loss.backward()
-            optimizer.step()
-
-            train_preds.extend(preds.detach().numpy())
-            train_loss += loss.item()
-        batch_train_loss = train_loss / len(train_loader)
-
-        model.eval()
-        with torch.no_grad():
-            for inputs, labels in val_loader:
-                preds = model(inputs)
-                loss = criterion(preds, labels)
-
-                val_preds.extend(preds.numpy())
-                val_loss += loss.item()
-        batch_val_loss = val_loss / len(val_loader)
-
-        train_losses.append(batch_train_loss)
-        val_losses.append(batch_val_loss)
-        print(f'Train loss: {batch_train_loss:.4}, Validation loss: {batch_val_loss:.4}')
-    train_preds = np.array(train_preds)
-    val_preds = np.array(val_preds)
-
-"""
-
-# test
-test_preds = []
-model.eval()
-with torch.no_grad():
-    for inputs, labels in test_loader:
-        preds = model(inputs)
-        test_preds.extend(preds.numpy())
-test_preds = np.array(test_preds)
-
-# plot training
-import matplotlib.pyplot as plt
-
-plt.figure()
-plt.title('Train Loss - Validation Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.plot(range(1, epochs + 1), train_losses, color='blue', linestyle='-', label='Train Loss')
-plt.plot(range(1, epochs + 1), val_losses, color='red', linestyle='--', label='Validation Loss')
-plt.legend()
-plt.show()
+from utils.setup import save_model, load_model, get_filepaths, output_log
 
 
-# plot predictions
-ft = 0  # 0 = open, 1 = close, 2 = highest, 3 = lowest
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+criterion = nn.CrossEntropyLoss()
 
-plt.figure(figsize=(15, 5))
-plt.subplot(1, 2, 1)
 
-# plt.plot(np.arange(y_train.shape[0]), y_train[:ft], color='blue', label='train target')
-#
-# plt.plot(np.arange(y_train.shape[0], y_train.shape[0] + y_val.shape[0]), y_val[:ft], color='gray', label='valid target')
-#
-# plt.plot(np.arange(y_train.shape[0] + y_val.shape[0], y_train.shape[0] + y_test.shape[0] + y_test.shape[0]),
-#          y_test[:ft], color='black', label='test target')
-#
-# plt.plot(np.arange(len(train_preds)), train_preds[:ft], color='red', label='train prediction')
-#
-# plt.plot(np.arange(len(train_preds), len(train_preds) + len(val_preds)),
-#          val_preds[:ft], color='orange', label='valid prediction')
-#
-# plt.plot(np.arange(len(train_preds) + len(val_preds),
-#                    len(train_preds) + len(val_preds) + len(test_preds)),
-#          test_preds[:ft], color='green', label='test prediction')
-#
-# plt.title('past and future stock prices')
-# plt.xlabel('time [days]')
-# plt.ylabel('normalized price')
-# plt.legend(loc='best')
+def evaluate(model, data_loader, log_filename, name='Eval'):
+    model.eval()
+    total_loss = 0.0
+    count = 0
+    with torch.no_grad():
+        for idx, (inputs, labels) in enumerate(data_loader):
+            inputs, labels = inputs.to(device), labels.to(device)
+            output = model(inputs)
+            output = output.reshape(labels.size())
+            loss = criterion(output, labels.double())
+            total_loss += loss.item()
+            count += output.size(0)
+        eval_loss = total_loss / count
+        message = name + " loss: {:.5f}".format(eval_loss)
+        output_log(message, log_filename)
+        return eval_loss
 
-plt.subplot(1, 2, 2)
-# plt.plot(np.arange(y_train.shape[0], y_train.shape[0] + y_test.shape[0]),
-#          y_test[:, ft], color='black', label='test target')
-#
-# plt.plot(np.arange(y_train.shape[0], y_train.shape[0] + y_test.shape[0]),
-#          test_preds[:, ft], color='green', label='test prediction')
 
-plt.title('future stock prices')
-plt.xlabel('time [days]')
-plt.ylabel('normalized price')
-plt.legend(loc='best')
+def run_epoch(epoch, model, optimizer, train_loader, args):
+    log_filename, _ = get_filepaths(args)
+    model.train()
+    total_loss = 0
+    count = 0
+    for idx, (inputs, labels) in enumerate(train_loader):
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        output = model(inputs)
+        output = output.reshape(labels.size())
+        loss = criterion(output, labels)
+        total_loss += loss.item()
+        count += output.size(0)
 
-plt.show()
+        if args.clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
 
-# corr_price_development_train =\
-#     np.sum(np.equal(np.sign(y_train[:1]-y_train[:0]), np.sign(y_train_pred[:1]-y_train_pred[:, 0]))
-#            .astype(int)) / y_train.shape[0]
-# corr_price_development_valid = \
-#     np.sum(np.equal(np.sign(y_val[:1]-y_val[:0]), np.sign(y_val_pred[:1]-y_val_pred[:, 0]))
-#            .astype(int)) / y_val.shape[0]
-# corr_price_development_test =\
-#     np.sum(np.equal(np.sign(y_test[:1]-y_test[:0]), np.sign(y_test_pred[:1]-y_test_pred[:, 0]))
-#            .astype(int)) / y_test.shape[0]
-#
-# print('correct sign prediction for close - open price for train/valid/test: %.2f/%.2f/%.2f' %
-#       (corr_price_development_train, corr_price_development_valid, corr_price_development_test))
-"""
+        loss.backward()
+        optimizer.step()
+
+        if idx > 0 and idx % args.log_interval == 0:
+            cur_loss = total_loss / count
+            message = "Epoch {:2d} | lr {:.5f} | loss {:.5f}".format(epoch, args.lr, cur_loss)
+            output_log(message, log_filename)
+            total_loss = 0.0
+            count = 0
+
+
+def train(model, data_loaders, args):
+    lr = args.lr
+    model.to(device)
+    log_filename, model_filename = get_filepaths(args)
+    train_loader, val_loader, test_loader = data_loaders
+    optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
+
+    best_vloss = 1e8
+    vloss_list = []
+    for epoch in range(1, args.epochs + 1):
+        run_epoch(epoch, model, optimizer, train_loader, args)
+
+        vloss = evaluate(model, val_loader, log_filename, name='Validation')
+        if vloss < best_vloss or epoch == 1:
+            save_model(model, model_filename)
+            best_vloss = vloss
+        if epoch > 10 and vloss > max(vloss_list[-3:]):
+            lr /= 10
+            output_log('lr = {}'.format(lr), log_filename)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+        vloss_list.append(vloss)
+
+    test(test_loader, args)
+
+
+def test(test_loader, args):
+    log_filename, model_filename = get_filepaths(args)
+    output_log('-' * 89, log_filename)
+    model = load_model(model_filename)
+    tloss = evaluate(model, test_loader, log_filename, name='Test')
+
+    wandb.log({"test_loss": tloss})
+    wandb.watch(model)

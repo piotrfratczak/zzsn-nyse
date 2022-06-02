@@ -177,3 +177,6 @@ cython_debug/
 # output training outputs but keep folder
 output/
 !output/.gitkeep
+
+# Wandb
+wandb/

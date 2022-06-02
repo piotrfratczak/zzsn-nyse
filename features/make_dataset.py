@@ -6,6 +6,7 @@ from numpy.lib import stride_tricks as st
 from torch.utils.data import TensorDataset, DataLoader
 
 from utils.load_data import load_file
+from utils.setup import get_features
 
 
 def calc_log_returns(prices):
@@ -16,8 +17,8 @@ def to_tensor(ndarray):
     return torch.tensor(ndarray).float()
 
 
-def slide_window(df, seq_len, pred_len):
-    return st.sliding_window_view(df, (seq_len + pred_len, df.shape[1]), axis=(0, 1), subok=True)[:-1, 0]
+def slide_window(df, seq_len, proj_len):
+    return st.sliding_window_view(df, (seq_len + proj_len, df.shape[1]), axis=(0, 1), subok=True)[:-1, 0]
 
 
 def pick_stock(df, symbol):
@@ -51,11 +52,12 @@ class DatasetMaker:
     def __init__(self):
         self.scalers = dict()
 
-    def make_dataset(self, columns: List[str], targets: List[str], seq_len: int, pred_len: int, batch_size: int):
-        columns = list(set(columns).union(set(targets)))
+    def make_dataset(self, args):
+        features, targets = get_features(args)
+        features = list(set(features).union(set(targets)))
         dataset = prepare_dataset()
-        split_dataset = self.concatenate_stocks(dataset, columns, seq_len, pred_len, targets)
-        train_loader, val_loader, test_loader = to_loaders(split_dataset, batch_size)
+        split_dataset = self.concatenate_stocks(dataset, features, targets, args.seq_len, args.proj_len)
+        train_loader, val_loader, test_loader = to_loaders(split_dataset, args.batch_size)
         return train_loader, val_loader, test_loader
 
     def standardize(self, df: pd.DataFrame, symbol: str):
@@ -67,15 +69,15 @@ class DatasetMaker:
         mean, std = self.scalers[symbol]
         return df * std + mean
 
-    def concatenate_stocks(self, dataset: pd.DataFrame, columns: List[str], seq_len: int, pred_len: int, targets: List[str]):
+    def concatenate_stocks(self, dataset: pd.DataFrame, features: List[str], targets: List[str], seq_len: int, proj_len: int):
         symbols = list(set(dataset.symbol))
         stock_df = pick_stock(dataset, symbols[0])
-        x_train, y_train, x_val, y_val, x_test, y_test = self.split_data(stock_df[columns], symbols[0], seq_len, pred_len, targets)
+        x_train, y_train, x_val, y_val, x_test, y_test = self.split_data(stock_df[features], symbols[0], seq_len, proj_len, targets)
 
         for symbol in symbols[1:]:
             stock_df = pick_stock(dataset, symbol)
             x_train_s, y_train_s, x_val_s, y_val_s, x_test_s, y_test_s = \
-                self.split_data(stock_df[columns], symbol, seq_len, pred_len, targets)
+                self.split_data(stock_df[features], symbol, seq_len, proj_len, targets)
 
             x_train = np.concatenate((x_train, x_train_s))
             y_train = np.concatenate((y_train, y_train_s))
@@ -85,7 +87,7 @@ class DatasetMaker:
             y_test = np.concatenate((y_test, y_test_s))
         return x_train, y_train, x_val, y_val, x_test, y_test
 
-    def split_data(self, stock: pd.DataFrame, symbol: str, seq_len: int, pred_len: int, targets: List[str], val_split: int = 10, test_split: int = 10):
+    def split_data(self, stock: pd.DataFrame, symbol: str, seq_len: int, proj_len: int, targets: List[str], val_split: int = 10, test_split: int = 10):
         val_size = int(np.round(val_split / 100 * stock.shape[0]))
         test_size = int(np.round(test_split / 100 * stock.shape[0]))
         train_size = stock.shape[0] - (val_size + test_size)
@@ -97,17 +99,17 @@ class DatasetMaker:
         val_series = standardized_log_returns[train_size: train_size + val_size]
         test_series = standardized_log_returns[train_size + val_size:]
 
-        train_windows = slide_window(train_series, seq_len, pred_len)
-        val_windows = slide_window(val_series, seq_len, pred_len)
-        test_windows = slide_window(test_series, seq_len, pred_len)
+        train_windows = slide_window(train_series, seq_len, proj_len)
+        val_windows = slide_window(val_series, seq_len, proj_len)
+        test_windows = slide_window(test_series, seq_len, proj_len)
 
         targets_idx = [stock.columns.get_loc(target) for target in targets if target in stock]
 
-        x_train = train_windows[:, :-pred_len, :]
-        y_train = train_windows[:, -pred_len:, targets_idx]
-        x_val = val_windows[:, :-pred_len, :]
-        y_val = val_windows[:, -pred_len:, targets_idx]
-        x_test = test_windows[:, :-pred_len, :]
-        y_test = test_windows[:, -pred_len:, targets_idx]
+        x_train = train_windows[:, :-proj_len, :]
+        y_train = train_windows[:, -proj_len:, targets_idx]
+        x_val = val_windows[:, :-proj_len, :]
+        y_val = val_windows[:, -proj_len:, targets_idx]
+        x_test = test_windows[:, :-proj_len, :]
+        y_test = test_windows[:, -proj_len:, targets_idx]
 
         return x_train, y_train, x_val, y_val, x_test, y_test

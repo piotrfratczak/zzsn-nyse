@@ -18,9 +18,9 @@ def analyze():
     print(df.info())
     print('--------')
     print(f'Missing values: {df.isnull().sum().sum()}')
-
+    print('First 10 columns:')
     symbols = list(set(df.symbol))
-    print(symbols[:10])
+    print(*symbols[:10], sep=', ')
 
     log_returns = df.copy()
     price_columns = ['open', 'close', 'high', 'low']
@@ -70,6 +70,7 @@ def analyze():
     plot_acf(plot_returns['close'])
     plt.show()
     plot_pacf(plot_returns['close'], method='ywm')
+    plt.grid()
     plt.show()
 
 
