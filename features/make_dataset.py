@@ -82,6 +82,8 @@ class DatasetMaker:
             stock_df = pick_stock(dataset, symbol)
             x_train_s, y_train_s, x_val_s, y_val_s, x_test_s, y_test_s = \
                 self.split_data(stock_df[features], symbol, seq_len, proj_len, targets)
+            if x_train_s.size == 0:
+                continue
 
             x_train = np.concatenate((x_train, x_train_s))
             y_train = np.concatenate((y_train, y_train_s))
@@ -103,6 +105,10 @@ class DatasetMaker:
         train_series = standardized_log_returns[:train_size]
         val_series = standardized_log_returns[train_size: train_size + val_size]
         test_series = standardized_log_returns[train_size + val_size:]
+
+        if test_series.shape[0] < seq_len + proj_len:
+            return np.ndarray([]), np.ndarray([]), np.ndarray([]),\
+                   np.ndarray([]), np.ndarray([]), np.ndarray([])
 
         train_windows = slide_window(train_series, seq_len, proj_len)
         val_windows = slide_window(val_series, seq_len, proj_len)
