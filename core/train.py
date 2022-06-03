@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchmetrics.functional import r2_score, mean_squared_error, mean_absolute_percentage_error
 
+from utils.visualize import plot_results
 from utils.setup import save_model, load_model, get_filepaths, output_log
 
 
@@ -85,6 +86,7 @@ def test(test_loader, args):
     model = load_model(model_filename)
     tloss = evaluate(model, nn.MSELoss(), test_loader, log_filename, name='Test')
     pred, target = predict(model, test_loader)
+    plot_results(pred, target)
 
     r2 = r2_score(pred, target, adjusted=1).item()
     rmse = torch.sqrt(mean_squared_error(pred, target)).item()
