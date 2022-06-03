@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 class GRUNet(nn.Module):
     """
     Gated Recurrent Unit.
@@ -16,8 +19,8 @@ class GRUNet(nn.Module):
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        h0 = torch.zeros(self.gru_layers, x.size(0), self.hidden_dim)
-        output, _ = self.gru(x, h0.detach())
+        h0 = torch.zeros(self.gru_layers, x.size(0), self.hidden_dim).to(device)
+        output, _ = self.gru(x, h0)
         output = output[:, -self.proj_len:, :]
         output = self.fc(output)
         return output
