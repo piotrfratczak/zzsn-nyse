@@ -24,9 +24,12 @@ def analyze():
     print(*symbols[:10], sep=', ')
 
     log_returns = df.copy()
+    log_returns['date'] = pd.to_datetime(log_returns['date'])
+    log_returns.sort_values(['symbol', 'date'], inplace=True)
     price_columns = ['open', 'close', 'high', 'low']
     numeric_columns = ['open', 'close', 'high', 'low', 'volume']
     log_returns[price_columns] = calc_log_returns(log_returns[price_columns])
+    log_returns = log_returns.iloc[1:]
     nc = log_returns[numeric_columns]
     log_returns[numeric_columns] = (nc - nc.mean()) / nc.std()
     plt.figure(figsize=(10, 10))
@@ -35,7 +38,7 @@ def analyze():
                 annot=True, fmt='.1g', vmin=-1, vmax=1, center=0, linewidth=3, linecolor='black', square=True)
     plt.show()
 
-    plot_symbol = 'AAPL'
+    plot_symbol = 'GOOG'
     plot_df = df[df['symbol'] == plot_symbol]
     plt.figure(figsize=(22, 18))
     x = plot_df.date
