@@ -19,7 +19,7 @@ def evaluate(model, criterion, data_loader, log_filename, name='Eval'):
             inputs, labels = inputs.to(device), labels.to(device)
             output = model(inputs)
             output = output.reshape(labels.size())
-            loss = criterion(output, labels.double())
+            loss = criterion(output, labels)
             total_loss += loss.item()
             count += output.size(0)
         eval_loss = total_loss / count
@@ -28,7 +28,7 @@ def evaluate(model, criterion, data_loader, log_filename, name='Eval'):
         return eval_loss
 
 
-def run_epoch(epoch, model, optimizer, criterion, train_loader, lr, args):
+def run_epoch(epoch, model, optimizer, criterion, train_loader, args):
     log_filename, _ = get_filepaths(args)
     model.train()
     total_loss = 0
@@ -38,7 +38,7 @@ def run_epoch(epoch, model, optimizer, criterion, train_loader, lr, args):
         optimizer.zero_grad()
         output = model(inputs)
         output = output.reshape(labels.size())
-        loss = criterion(output, labels.double())
+        loss = criterion(output, labels)
         total_loss += loss.item()
         count += output.size(0)
 
@@ -50,39 +50,32 @@ def run_epoch(epoch, model, optimizer, criterion, train_loader, lr, args):
 
         if idx > 0 and idx % args.log_interval == 0:
             cur_loss = total_loss / count
-            message = "Epoch {:2d} | lr {:.5f} | loss {:.5f}".format(epoch, lr, cur_loss)
+            message = "Epoch {:2d} | loss {:.5f}".format(epoch, cur_loss)
             output_log(message, log_filename)
-            wandb.log({'train_loss': cur_loss, 'learning_rate': lr})
+            wandb.log({'train_loss': cur_loss})
             total_loss = 0.0
             count = 0
 
 
 def train(model, data_loaders, args):
-    lr = args.lr
     model.to(device)
     log_filename, model_filename = get_filepaths(args)
     train_loader, val_loader, test_loader = data_loaders
 
-    optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    criterion = nn.MSELoss(reduction='mean')
 
     best_vloss = 1e8
     vloss_list = []
     for epoch in range(1, args.epochs + 1):
-        run_epoch(epoch, model, optimizer, criterion, train_loader, lr, args)
+        run_epoch(epoch, model, optimizer, criterion, train_loader, args)
 
         vloss = evaluate(model, criterion, val_loader, log_filename, name='Validation')
         if vloss < best_vloss or epoch == 1:
             save_model(model, model_filename)
             best_vloss = vloss
-        if epoch > 10 and vloss > max(vloss_list[-3:]):
-            lr /= 10
-            output_log('lr = {}'.format(lr), log_filename)
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
         vloss_list.append(vloss)
         wandb.log({'val_loss': vloss})
-
     test(test_loader, args)
 
 
@@ -114,5 +107,4 @@ def predict(model, data_loader):
             predicted.append(output)
     original = torch.cat(original, dim=0).squeeze()
     predicted = torch.cat(predicted, dim=0).squeeze()
-    wandb.log({'target': original.numpy(), 'prediction': predicted.numpy()})
     return predicted, original

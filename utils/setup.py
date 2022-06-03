@@ -19,24 +19,23 @@ class dotdict(dict):
 def parse_args():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--features', type=str, default='cohl')
+    parser.add_argument('--features', type=str, default='c')
     parser.add_argument('--targets', type=str, default='c')
-    parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--clip', type=float, default=0.15)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--ksize', type=int, default=6)
+    parser.add_argument('--dropout', type=float, default=0.35)
+    parser.add_argument('--clip', type=float, default=0.35)
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--ksize', type=int, default=9)
     parser.add_argument('--n_level', type=int, default=3)
-    parser.add_argument('--log_interval', type=int, default=500, metavar='N')
-    parser.add_argument('--lr', type=float, default=5e-03)
-    parser.add_argument('--optim', type=str, default='Adam')
+    parser.add_argument('--log_interval', type=int, default=200, metavar='N')
+    parser.add_argument('--lr', type=float, default=5e-01)
     parser.add_argument('--model', type=str, default='RT')
-    parser.add_argument('--rnn_type', type=str, default='GRU')
-    parser.add_argument('--d_model', type=int, default=1)
-    parser.add_argument('--n', type=int, default=2)
-    parser.add_argument('--h', type=int, default=1)
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--rnn_type', type=str, default='LSTM')
+    parser.add_argument('--d_model', type=int, default=128)
+    parser.add_argument('--n', type=int, default=1)
+    parser.add_argument('--h', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--proj_len', type=int, default=1)
-    parser.add_argument('--seq_len', type=int, default=8)
+    parser.add_argument('--seq_len', type=int, default=14)
     parser.add_argument('--seed', type=int, default=1111)
 
     args = parser.parse_args()
@@ -112,8 +111,8 @@ def get_filepaths(args):
     else:
         model_name = 'GRU_h_{}_layers_{}'.format(args.h, args.n)
 
-    model_name += '_feat_{}_target_{}_proj_{}_seq_{}_drop_{}_lr_{}_optim_{}'\
-        .format(args.features, args.targets, args.proj_len, args.seq_len, args.dropout, args.lr, args.optim)
+    model_name += '_feat_{}_target_{}_proj_{}_seq_{}_drop_{}'\
+        .format(args.features, args.targets, args.proj_len, args.seq_len, args.dropout)
 
     log_filename = out_dir + 'log_' + model_name + '.txt'
     model_filename = out_dir + 'model_' + model_name + '.pt'

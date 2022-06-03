@@ -42,9 +42,9 @@ def to_loaders(datasets: tuple, batch_size: int):
     val_set = TensorDataset(to_tensor(x_val), to_tensor(y_val))
     test_set = TensorDataset(to_tensor(x_test), to_tensor(y_test))
 
-    train_loader = DataLoader(train_set, batch_size, shuffle=True, drop_last=True)
-    val_loader = DataLoader(val_set, batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(test_set, batch_size, shuffle=False, drop_last=True)
+    train_loader = DataLoader(train_set, batch_size, shuffle=True, drop_last=False)
+    val_loader = DataLoader(val_set, batch_size, shuffle=True, drop_last=False)
+    test_loader = DataLoader(test_set, batch_size, shuffle=False, drop_last=False)
     return train_loader, val_loader, test_loader
 
 

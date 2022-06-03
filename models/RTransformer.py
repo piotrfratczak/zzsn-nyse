@@ -24,7 +24,7 @@ class RT(nn.Module):
         x = self.encoder(x)
         output = self.rt(x)
         output = output[:, -self.proj_len, :]
-        output = self.linear(output).double()
+        output = self.linear(output)
         return output
 
 
