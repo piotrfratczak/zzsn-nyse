@@ -86,10 +86,11 @@ def train(model, data_loaders, args):
     test(test_loader, args)
 
 
-def test(test_loader, args):
+def test(test_loader, args, model=None):
     log_filename, model_filename = get_filepaths(args)
     output_log('-' * 89, log_filename)
-    model = load_model(model_filename)
+    if not model:
+        model = load_model(model_filename)
     tloss = evaluate(model, nn.MSELoss(), test_loader, log_filename, name='Test')
     pred, target = predict(model, test_loader)
     plot_results(pred, target)
