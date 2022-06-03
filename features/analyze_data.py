@@ -30,6 +30,7 @@ def analyze():
     numeric_columns = ['open', 'close', 'high', 'low', 'volume']
     log_returns[price_columns] = calc_log_returns(log_returns[price_columns])
     log_returns = log_returns.iloc[1:]
+    log_returns.drop(log_returns.ne(log_returns.shift()).apply(lambda x: x.index[x].tolist())['symbol'], inplace=True)
     nc = log_returns[numeric_columns]
     log_returns[numeric_columns] = (nc - nc.mean()) / nc.std()
     plt.figure(figsize=(10, 10))

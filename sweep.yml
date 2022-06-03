@@ -1,26 +1,32 @@
 program: main.py
-method: bayes
+method: grid
 metric:
   name: adjusted_r2
   goal: maximize
 parameters:
-  lr:
-    min: 0.0001
-    max: 0.01
-  optim:
-    values: ["Adam", "SGD"]
   features:
-    values: ['c', 'co', 'cohl']
+    values: ['chl']
   dropout:
-    values: [0.1, 0.2, 0.3]
+    values: [0.15]
+  clip:
+    values: [0.15]
   n:
-    min: 2
-    max: 32
+    values: [1]
   h:
-    values: [32, 64, 128, 256]
+    values: [8]
+  n_level:
+    values: [3]
+  ksize:
+    values: [7]
+  lr:
+    values: [0.1]
   epochs:
-    values: [20]
+    values: [30]
   model:
-    values: ['GRU']
+    values: ['RT']
   seq_len:
-    values: [14]
+    values: [25]
+  batch_size:
+    values: [128]
+  d_model:
+    values: [512]

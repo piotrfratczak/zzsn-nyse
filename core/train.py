@@ -59,12 +59,13 @@ def run_epoch(epoch, model, optimizer, criterion, train_loader, args):
 
 
 def train(model, data_loaders, args):
+    lr = args.lr
     model.to(device)
     log_filename, model_filename = get_filepaths(args)
     train_loader, val_loader, test_loader = data_loaders
 
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.MSELoss(reduction='mean')
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
 
     best_vloss = 1e8
     vloss_list = []
@@ -75,6 +76,11 @@ def train(model, data_loaders, args):
         if vloss < best_vloss or epoch == 1:
             save_model(model, model_filename)
             best_vloss = vloss
+        if epoch > 10 and vloss > max(vloss_list[-3:]):
+            lr /= 10
+            output_log('lr = {}'.format(lr), log_filename)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
         vloss_list.append(vloss)
         wandb.log({'val_loss': vloss})
     test(test_loader, args)
@@ -93,6 +99,7 @@ def test(test_loader, args):
     mape = mean_absolute_percentage_error(pred, target).item()
 
     wandb.log({'test_loss': tloss, 'adjusted_r2': r2, 'rmse': rmse, 'mape': mape})
+    wandb.log({'predicted': wandb.Histogram(pred.cpu()), 'target': wandb.Histogram(target.cpu())})
     wandb.watch(model)
 
 
