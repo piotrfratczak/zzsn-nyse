@@ -1,5 +1,6 @@
 # zzsn-nyse
-NYSE modeling with R-Transformer and GRU.
+NYSE modeling with R-Transformer and GRU.  
+Data source: https://www.kaggle.com/datasets/dgawlik/nyse
 
 ## Setup environment
 ```shell
