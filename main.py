@@ -1,4 +1,4 @@
-from core.train import train, test
+from core.train import train, test, base_case
 from utils.setup import parse_args, get_model
 from features.make_dataset import DatasetMaker
 

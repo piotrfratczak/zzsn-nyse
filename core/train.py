@@ -117,3 +117,28 @@ def predict(model, data_loader):
     original = torch.cat(original, dim=0).squeeze()
     predicted = torch.cat(predicted, dim=0).squeeze()
     return predicted, original
+
+
+def base_case(data_loader, criterion=nn.MSELoss()):
+    original = []
+    predicted = []
+    total_loss = 0.0
+    count = 0
+    for inputs, labels in data_loader:
+        output = inputs[:, -1, 0]
+        output = output.reshape(labels.size())
+        original.append(labels)
+        predicted.append(output)
+        loss = criterion(output, labels)
+        total_loss += loss.item()
+        count += output.size(0)
+    eval_loss = total_loss / count
+    original = torch.cat(original, dim=0).squeeze()
+    predicted = torch.cat(predicted, dim=0).squeeze()
+    plot_results(predicted, original)
+    r2 = r2_score(predicted, original, adjusted=1).item()
+    rmse = torch.sqrt(mean_squared_error(predicted, original)).item()
+    mape = mean_absolute_percentage_error(predicted, original).item()
+    wandb.log({'base_loss': eval_loss, 'adjusted_r2': r2, 'rmse': rmse, 'mape': mape})
+    wandb.log({'predicted': wandb.Histogram(predicted), 'target': wandb.Histogram(original)})
+    return eval_loss, r2, rmse, mape
